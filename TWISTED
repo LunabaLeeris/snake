@@ -1,0 +1,353 @@
+import pygame
+import os
+import random
+import time
+
+pygame.display.set_caption('Amazing Snake')
+t1 = time.time()
+
+
+class Snake:
+    def __init__(self, parent_surface, length=3):
+        self.parent_surface = parent_surface
+        self.snake_head = pygame.Rect(237.5, 237.5, 15, 15)
+        self.length = length
+        self.x = [237.5] * length
+        self.y = [237.5] * length
+        self.direction = [1] * length
+        self.angle = 0
+        self.SNAKE_BODY = pygame.USEREVENT + 2
+
+        # colors
+        self.BROWN = [(120, 85, 29), (196, 144, 59), (219, 172, 96)]
+        self.RED = 224, 70, 22
+        self.GRAY = 160, 160, 160
+        self.BLACK = 0, 0, 0
+        self.GREEN = [(87, 191, 55), (162, 209, 82), (189, 194, 62), (219, 172, 96)]
+
+        # positions
+        self.CENTER = (237.5, 237.5)
+
+        # Sizes
+        self.STANDARD = 20
+        self.BODY = (20, 20)
+
+        # figures
+        self.SNAKE_HEAD_IMAGE = pygame.image.load(os.path.join('assets', 'snake.png'))
+        self.SNAKE_HEAD = pygame.transform.scale(self.SNAKE_HEAD_IMAGE, (self.STANDARD, self.STANDARD))
+        self.BOTTOM_BORDER = pygame.Rect(0, 450, 500, 50)
+        self.text_font = pygame.font.SysFont('consolas', 15)
+        self.text_font1 = pygame.font.SysFont('consolas', 50)
+
+    def draw_border(self):
+        self.parent_surface.fill(self.BROWN[2])
+        pygame.draw.rect(self.parent_surface, self.GRAY, self.BOTTOM_BORDER)
+
+    def draw_snake_head(self):
+        self.parent_surface.blit(pygame.transform.rotate(self.SNAKE_HEAD, self.angle),
+                                 (self.snake_head.x, self.snake_head.y))
+
+    def draw_datas(self):
+        self.parent_surface.blit(self.text_font.render('SCORE: ' + str(self.length - 3), True, self.RED), (5, 460))
+        t2 = round((time.time() - t1), 2)
+        self.parent_surface.blit((self.text_font.render('TIME: ' + str(t2), True, self.RED)), (400, 460))
+
+    def draw_snake_body(self):
+        for i in range(1, self.length):
+            if i == 1:
+                pygame.draw.rect(self.parent_surface, self.GREEN[0],
+                                 pygame.Rect(self.x[i], self.y[i], self.STANDARD, self.STANDARD))
+            else:
+                pygame.draw.rect(self.parent_surface, self.BLACK,
+                                 pygame.Rect(self.x[i], self.y[i], self.STANDARD, self.STANDARD))
+
+            if i > 3 and pygame.Rect(self.x[i], self.y[i], self.STANDARD, self.STANDARD).colliderect(self.snake_head):
+                pygame.event.post(pygame.event.Event(self.SNAKE_BODY))
+            # asks for commission after drawing body
+
+    def draw_game(self):
+        self.draw_border()
+        self.draw_datas()
+        self.draw_snake_head()
+        self.draw_snake_body()
+
+
+class Food:
+    def __init__(self, surface):
+        self.SNAKE_FOOD_IMAGE = pygame.image.load(os.path.join('assets', 'cherry.png'))
+        self.SNAKE_FOOD = pygame.transform.scale(self.SNAKE_FOOD_IMAGE, (25, 25))
+        self.parent_surface = surface
+        self.food_rect = pygame.Rect(random.randint(25, 425), random.randint(25, 425), 20, 20)
+
+    def draw(self):
+        self.parent_surface.blit(self.SNAKE_FOOD, (self.food_rect.x - 2.5, self.food_rect.y - 2.5))
+
+
+class Obstacles:
+    def __init__(self, time_now, length, surface, snake_head):
+        self.time = time_now
+        self.length = length
+        self.surface = surface
+        self.wall_count = 4
+        self.duration = 3*((4/5)**(self.length//5))
+        self.snake_head = snake_head
+        self.SNAKE_WALL = pygame.USEREVENT + 3
+
+        self.RED_SOFT = 242, 107, 92
+        self.WALL_COLOR = ((252, 50, 50), (252, 98, 50), (255, 181, 33))
+        self.choices = (15, 126)
+
+        self.x_wall = [random.randint(20, 375) for _ in range(self.wall_count)]
+        self.y_wall = [random.randint(20, 325) for _ in range(self.wall_count)]
+
+        self.width_wall = [random.choice(self.choices) for _ in range(self.wall_count)]
+        self.height_wall = [self.choices[0] if i != self.choices[0] else self.choices[1] for i in self.width_wall]
+
+    def draw_shadow_wall(self):
+        for i in range(self.wall_count):
+            pygame.draw.rect(self.surface, self.RED_SOFT,
+                             pygame.Rect(self.x_wall[i], self.y_wall[i],
+                                         self.width_wall[i],
+                                         self.height_wall[i]))
+
+    def draw_wall(self):
+        if time.time() - self.time < self.duration:
+            self.draw_shadow_wall()
+
+        elif self.duration <= time.time() - self.time < self.duration * 3:
+            for i in range(self.wall_count):
+                pygame.draw.rect(self.surface, random.choice(self.WALL_COLOR),
+                                 pygame.Rect(self.x_wall[i], self.y_wall[i], self.width_wall[i], self.height_wall[i]))
+
+                if pygame.Rect(self.x_wall[i], self.y_wall[i], self.width_wall[i], self.height_wall[i]).colliderect(self.snake_head):
+                    pygame.event.post(pygame.event.Event(self.SNAKE_WALL))
+
+        else:
+            self.time = time.time()
+            self.x_wall = [random.randint(20, 375) for _ in range(self.wall_count)]
+            self.y_wall = [random.randint(20, 325) for _ in range(self.wall_count)]
+
+            self.width_wall = [random.choice(self.choices) for _ in range(self.wall_count)]
+            self.height_wall = [self.choices[0] if i != self.choices[0] else self.choices[1] for i in self.width_wall]
+
+
+class Game:
+    def __init__(self):
+        self.initialize = pygame.init()
+        self.WIDTH, self.HEIGHT = 500, 500
+        self.surface = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
+        self.snake = Snake(self.surface)
+        self.VEL = 4
+        self.FPS = 60
+        self.distance = self.snake.STANDARD - self.VEL
+        self.food = Food(self.surface)
+        self.SNAKE_OVER = pygame.USEREVENT + 1
+        self.GAME_OVER = self.snake.text_font1.render('GAME OVER!', True, self.snake.RED)
+        self.prev_time = time.time()
+        self.obstacles = Obstacles(self.prev_time, self.snake.length, self.surface, self.snake.snake_head)
+        self.wall_mode = False
+
+    def game_end(self):
+        if self.snake.snake_head.x + self.snake.STANDARD >= self.WIDTH or \
+                self.snake.snake_head.x <= 0 or \
+                self.snake.snake_head.y + self.snake.STANDARD >= self.snake.BOTTOM_BORDER.y or \
+                self.snake.snake_head.y - self.snake.STANDARD < -20:
+            pygame.event.post(pygame.event.Event(self.SNAKE_OVER))
+
+    def randomize_food(self):
+        self.food.food_rect.x = random.randint(25, 425)
+        self.food.food_rect.y = random.randint(25, 425)
+
+    def check_food_eaten(self):
+        if self.food.food_rect.colliderect(self.snake.snake_head):
+            self.snake.length += 1
+
+            self.snake.x.append(self.snake.x[len(self.snake.x) - 1])
+            self.snake.y.append(self.snake.y[len(self.snake.y) - 1])
+            self.snake.direction.append(self.snake.direction[len(self.snake.direction) - 1])
+
+            self.randomize_food()
+            self.check()
+
+    def play(self):
+
+        self.game_end()
+        self.snake.draw_game()
+        self.food.draw()
+        self.check_food_eaten()
+
+        if self.wall_mode:  # checks if its now wall mode
+            self.obstacles.snake_head = self.snake.snake_head
+            self.obstacles.length = self.snake.length
+            self.obstacles.draw_wall()
+
+        pygame.display.update()
+
+    def head_direction(self):
+        if self.snake.direction[0] == 0:
+            self.snake.snake_head.y -= self.VEL
+            self.snake.y[0] = self.snake.y[0] - self.VEL
+        elif self.snake.direction[0] == 1:
+            self.snake.snake_head.y += self.VEL
+            self.snake.y[0] = self.snake.y[0] + self.VEL
+        elif self.snake.direction[0] == 2:
+            self.snake.snake_head.x -= self.VEL
+            self.snake.x[0] = self.snake.x[0] - self.VEL
+        elif self.snake.direction[0] == 3:
+            self.snake.snake_head.x += self.VEL
+            self.snake.x[0] = self.snake.x[0] + self.VEL
+
+    def movement(self):
+
+        for i in range(self.snake.length - 1, 0, -1):
+
+            if self.snake.direction[i - 1] == 0 or self.snake.direction[i - 1] == 1:  # up or down
+
+                if self.snake.direction[i] == 0:  # for up
+                    if self.snake.y[i] - self.snake.y[i - 1] > self.distance:
+                        self.snake.y[i] -= self.snake.y[i] - self.snake.y[i - 1] - self.distance
+
+                elif self.snake.direction[i] == 1:  # for down
+                    if self.snake.y[i - 1] - self.snake.y[i] > self.distance:
+                        self.snake.y[i] += self.snake.y[i - 1] - self.snake.y[i] - self.distance
+
+                elif self.snake.direction[i] == 2 or 3:
+
+                    if self.snake.x[i] - self.snake.x[i - 1] > 0:  # for left
+                        self.snake.x[i] -= self.VEL
+                        if (self.snake.x[i] - self.VEL) - self.snake.x[i - 1] < 0:
+                            self.snake.x[i] = self.snake.x[i - 1]
+
+                    elif self.snake.x[i - 1] - self.snake.x[i] > 0:  # for right
+                        self.snake.x[i] += self.VEL
+                        if self.snake.x[i - 1] - (self.snake.x[i] + self.VEL) < 0:
+                            self.snake.x[i] = self.snake.x[i - 1]
+
+                    if self.snake.y[i] - self.snake.y[i - 1] > self.distance:
+                        self.snake.y[i] -= self.snake.y[i] - self.snake.y[i - 1] - self.distance
+
+                    elif self.snake.y[i - 1] - self.snake.y[i] > self.distance:
+                        self.snake.y[i] += self.snake.y[i - 1] - self.snake.y[i] - self.distance
+
+                    if self.snake.x[i] == self.snake.x[i - 1] and \
+                            self.snake.y[i] == \
+                            self.snake.y[i] - (self.snake.y[i] - self.snake.y[i - 1] - self.distance):
+                        self.snake.direction[i] = 0
+
+                    elif self.snake.x[i] == self.snake.x[i - 1] and \
+                            self.snake.y[i] == \
+                            self.snake.y[i] + self.snake.y[i - 1] - self.snake.y[i] - self.distance:
+                        self.snake.direction[i] = 1
+
+            elif self.snake.direction[i - 1] == 2 or self.snake.direction[i - 1] == 3:  # left or right
+
+                if self.snake.direction[i] == 2:
+                    if self.snake.x[i] - self.snake.x[i - 1] > self.distance:
+                        self.snake.x[i] -= self.snake.x[i] - self.snake.x[i - 1] - self.distance
+
+                elif self.snake.direction[i] == 3:
+                    if self.snake.x[i - 1] - self.snake.x[i] > self.distance:
+                        self.snake.x[i] += self.snake.x[i - 1] - self.snake.x[i] - self.distance
+
+                elif self.snake.direction[i] == 0 or 1:
+                    if self.snake.y[i] - self.snake.y[i - 1] > 0:
+                        self.snake.y[i] -= self.VEL
+                        if (self.snake.y[i] - self.VEL) - self.snake.y[i - 1] < 0:
+                            self.snake.y[i] = self.snake.y[i - 1]
+
+                    elif self.snake.y[i - 1] - self.snake.y[i] > 0:
+                        self.snake.y[i] += self.VEL
+                        if self.snake.y[i - 1] - (self.snake.y[i] + self.VEL) < 0:
+                            self.snake.y[i] = self.snake.y[i - 1]
+
+                    if self.snake.x[i] - self.snake.x[i - 1] > self.distance:
+                        self.snake.x[i] -= self.snake.x[i] - self.snake.x[i - 1] - self.distance
+
+                    elif self.snake.x[i - 1] - self.snake.x[i] > self.distance:
+                        self.snake.x[i] += self.snake.x[i - 1] - self.snake.x[i] - self.distance
+
+                    if self.snake.y[i] == self.snake.y[i - 1] and \
+                            self.snake.x[i] == \
+                            self.snake.x[i] - (self.snake.x[i] - self.snake.x[i - 1] - self.distance):
+                        self.snake.direction[i] = 2
+
+                    elif self.snake.y[i] == self.snake.y[i - 1] and \
+                            self.snake.x[i] == \
+                            self.snake.x[i] + self.snake.x[i - 1] - self.snake.x[i] - self.distance:
+                        self.snake.direction[i] = 3
+
+            self.play()
+
+    def death_animation(self):
+        for j in range(3):
+            for i in range(1, self.snake.length):
+                if i == 1:
+                    pygame.draw.rect(self.snake.parent_surface, self.snake.GREEN[j + 1],
+                                     pygame.Rect(self.snake.x[i], self.snake.y[i],
+                                                 self.snake.STANDARD, self.snake.STANDARD))
+                else:
+                    pygame.draw.rect(self.snake.parent_surface, self.snake.BROWN[j],
+                                     pygame.Rect(self.snake.x[i], self.snake.y[i],
+                                                 self.snake.STANDARD, self.snake.STANDARD))
+
+                pygame.display.update()
+                time.sleep(.05)
+
+    def check(self):
+        if self.snake.length % 5 == 0:
+            self.VEL += 1
+            self.distance = self.snake.STANDARD - self.VEL
+
+        if self.snake.length % 5 == 0 and self.snake.length != 5:
+            self.prev_time = time.time()
+            self.obstacles.time = self.prev_time
+            self.obstacles.duration = 3*((4/5)**(self.obstacles.length//5))
+            self.wall_mode = True
+
+    def game_over(self):
+        self.surface.blit(self.GAME_OVER, (
+            (self.WIDTH / 2) - (self.GAME_OVER.get_width() / 2), (self.HEIGHT / 2) - (self.GAME_OVER.get_height() / 2)))
+        pygame.display.update()
+        time.sleep(2)
+        pygame.quit()
+
+    def run(self):
+
+        clock = pygame.time.Clock()
+        running = True
+
+        while running:
+            clock.tick(self.FPS)
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                    pygame.quit()
+
+                if event.type == self.SNAKE_OVER or event.type == self.snake.SNAKE_BODY or \
+                        event.type == self.obstacles.SNAKE_WALL:
+                    self.death_animation()
+                    self.game_over()
+                    running = False
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP and self.snake.direction[0] != 1:
+                        self.snake.direction[0] = 0
+                        self.snake.angle = 180
+                    if event.key == pygame.K_DOWN and self.snake.direction[0] != 0:
+                        self.snake.direction[0] = 1
+                        self.snake.angle = 0
+                    if event.key == pygame.K_LEFT and self.snake.direction[0] != 3:
+                        self.snake.direction[0] = 2
+                        self.snake.angle = 270
+                    if event.key == pygame.K_RIGHT and self.snake.direction[0] != 2:
+                        self.snake.direction[0] = 3
+                        self.snake.angle = 90
+
+            self.head_direction()
+            self.movement()
+
+
+if __name__ == '__main__':
+    game = Game()
+    game.run()
